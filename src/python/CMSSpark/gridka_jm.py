@@ -147,15 +147,19 @@ def run(date, fout, hdir, yarn=None, verbose=None):
         df.registerTempTable('jm_df')
         tables = {'jm_df': df}
 
+        # Cache data in memory and disk
+        df.persist(StorageLevel.MEMORY_AND_DISK)
+
         return tables
 
     create_jm_table(ctx, sqlContext, date='', verbose=verbose)
 
     # Query JobMonitoring data
-    cols = ['TaskMonitorId', 'WNHostName', 'Application', 'ApplicationVersion', 'NCores', 'JobType', 'Type',
-            'GenericType', 'SubmissionTool', 'NEvProc', 'NEvReq', 'WrapCPU', 'WrapWC']
+    attributes = {'cols': ['TaskMonitorId', 'WNHostName', 'Application', 'ApplicationVersion', 'NCores', 'JobType',
+                           'Type', 'GenericType', 'SubmissionTool', 'NEvProc', 'NEvReq', 'WrapCPU', 'WrapWC'],
+                  'conditions': {'SiteName': 'T1_DE_KIT'}}
 
-    stmt = 'SELECT %s FROM jm_df WHERE jm_df.SiteName="T1_DE_KIT"' % ','.join(cols)
+    stmt = 'SELECT %s FROM jm_df WHERE jm_df.SiteName="T1_DE_KIT"' % ','.join(attributes.get('cols'))
     print(stmt)
     query = sqlContext.sql(stmt)
     print_rows(query, stmt, verbose)
@@ -172,8 +176,8 @@ def run(date, fout, hdir, yarn=None, verbose=None):
 
 
 def main():
-    "Main function"
-    optmgr  = OptionParser()
+    """Main function"""
+    optmgr = OptionParser()
     opts = optmgr.parser.parse_args()
     print("Input arguments: %s" % opts)
     time0 = time.time()
@@ -181,6 +185,7 @@ def main():
     print('Start time  : %s' % time.strftime('%Y-%m-%d %H:%M:%S GMT', time.gmtime(time0)))
     print('End time    : %s' % time.strftime('%Y-%m-%d %H:%M:%S GMT', time.gmtime(time.time())))
     print('Elapsed time: %s sec' % elapsed_time(time0))
+
 
 if __name__ == '__main__':
     main()
