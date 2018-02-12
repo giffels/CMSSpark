@@ -155,12 +155,46 @@ def run(date, fout, hdir, yarn=None, verbose=None):
     create_jm_table(ctx, sqlContext, date='', verbose=verbose)
 
     # Query JobMonitoring data
-    attributes = {'cols': ['TaskMonitorId', 'WNHostName', 'Application', 'ApplicationVersion', 'NCores', 'JobType',
-                           'Type', 'GenericType', 'SubmissionTool', 'NEvProc', 'NEvReq', 'WrapCPU', 'WrapWC'],
-                  'conditions': {'SiteName': 'T1_DE_KIT'}}
+    class QueryBuild(object):
+        def __init__(self, table_name, columns='*', conditions=None):
+            self.attributes = {'columns': columns, 'conditions': conditions, 'table_name': table_name}
+            self.convert_functions = {'columns': self.convert_columns,
+                                      'conditions': self.convert_conditions,
+                                      'table_name': lambda x: x}
 
-    stmt = 'SELECT %s FROM jm_df WHERE jm_df.SiteName="T1_DE_KIT"' % ','.join(attributes.get('cols'))
+        def __getattr__(self, item):
+            return self.convert_functions[item](self.attributes[item])
+
+        @staticmethod
+        def convert_columns(columns):
+            if isinstance(columns, list):
+                if len(columns) > 1:
+                    return ','.join(columns)
+                else:
+                    return columns[0]
+            else:
+                return columns
+
+        def convert_conditions(self, conditions):
+            first_item = True
+            condition_string = ''
+            for column, condition in conditions.iteritems():
+                if first_item:
+                    condition_string = 'WHERE {}.{}="{}"'.format(self.attributes['table_name'], column, condition)
+                    first_item = False
+                else:
+                    condition_string += ' AND {}.{}="{}"'.format(self.attributes['table_name'], column, condition)
+            return condition_string
+
+    query_attributes = QueryBuild('jm_df', ['TaskMonitorId', 'WNHostName', 'Application', 'ApplicationVersion',
+                                            'NCores', 'JobType', 'Type', 'GenericType', 'SubmissionTool', 'NEvProc',
+                                            'NEvReq', 'WrapCPU', 'WrapWC', 'StartedRunningTimeStamp',
+                                            'FinishedTimeStamp'], {'SiteName': 'T1_DE_KIT'})
+
+    stmt = 'SELECT {q.columns} FROM {q.table_name} {q.conditions}'.format(q=query_attributes)
+
     print(stmt)
+
     query = sqlContext.sql(stmt)
     print_rows(query, stmt, verbose)
 
